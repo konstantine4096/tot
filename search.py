@@ -41,8 +41,41 @@ and A*.
 '''
 
 from queue import *
+from heapq import merge 
 from abc import ABC, abstractmethod
 import numpy as np
+
+def in_place_merge_descending(L1, L2, get_key=lambda x: x):
+    '''
+    This helper function takes two lists L1 and L2 of arbitrary objects, where every such object x 
+    has some numeric key associated with it, obtained by get_key(x). (By default, get_key is the
+    identity function.) L1 is already sorted in reverse. This function sorts L2 (also in reverse order)
+    and then does an in-place merge of the result with L1. The idea here is that L1 will typically
+    be large and already sorted, while L2 will be relatively small. So instead of adding L2's elements
+    to L1 and then re-sorting the entire thing from scratch, we only sort L2 and then merge. 
+    '''
+    # First, sort L2: 
+    L2.sort(key=get_key,reverse=True)
+    # Then, expand L1 to accommodate the elements of L2: 
+    L1.extend([None] * len(L2))
+    # Set up three indices (for L1, L2, and the merged list): 
+    i1 = len(L1) - len(L2) - 1  # Index of the last non-None element in the original L1
+    i2 = len(L2) - 1            # Index of the last element in L2
+    i = len(L1) - 1             # Index for the merged list
+    # Finally, merge L2 into L1 in-place, starting from the end: 
+    while i1 >= 0 and i2 >= 0:
+        if get_key(L1[i1]) < get_key(L2[i2]):
+            L1[i] = L1[i1]
+            i1 -= 1
+        else:
+            L1[i] = L2[i2]
+            i2 -= 1
+        i -= 1
+    # If any elements are left in L2, place them at whatever empty locations remain in L1: 
+    while i2 >= 0:
+        L1[i] = L2[i2]
+        i2 -= 1
+        i -= 1
 
 class State(ABC):
 
@@ -193,7 +226,7 @@ class State(ABC):
             add_to_table(state,visited_table)
             if state.is_valid() and not(max_depth is not None and state.depth > max_depth): 
                 if state.is_solution():
-                    print("\nSuccess! Solution found after " + str(iteration)  + " iterations : " + str(state))
+                    print("\nSuccess! Solution found after " + str(iteration)  + " iterations: " + str(state))
                     solutions.append(state)
                     if len(solutions) >= max_solutions:
                         return (solutions,iteration)
@@ -240,12 +273,17 @@ class State(ABC):
     
     @staticmethod        
     def sorter(new_states,old_states,beam_width=None):
-        old_states.extend(new_states)
-        # We sort in reverse order so that the smallest-distance element is at the right end of the list.
-        # This ensures that we can then get the best state to expand in O(1) time. 
-        old_states.sort(key=lambda s: -(s.get_cost() + s.distance()))
-        # If a beam width is specified, keep only the candidates in the beam, pruning everything else.
-        # Since we are sorting in reverse, this means we need to keep the *last* beam_width list elements. 
+        '''
+        Instead of adding the new states to the old states and sorting the result, we can take advantage of the fact that
+        the old states are already sorted, so we only need to sort the new states (typically a relatively short list) and then
+        merge the resulting list with the old states, a linear-time operation.
+        We sort in reverse order so that the smallest-distance element is at the right end of the list.
+        This ensures that we can then get the best state to expand in O(1) time. 
+        #old_states.sort(key=lambda s: -(s.get_cost() + s.distance()))
+        If a beam width is specified, keep only the candidates in the beam, pruning everything else.
+        Since we are sorting in reverse, this means we need to keep the *last* beam_width list elements.         
+        '''
+        in_place_merge_descending(old_states,new_states,get_key=lambda s: s.get_cost() + s.distance())
         if beam_width:
             # Remove all but the last beam_width elements: 
             del old_states[:-beam_width]
@@ -257,7 +295,7 @@ class State(ABC):
                            state_iterator=lambda states: reversed(states),
                            params=params)                                                      
     
-    def beam_search(self,params=default_params): 
+    def beam_search(self,params=default_params):
         return self.search(make_initial_frontier=lambda state: [state],
                            add_states=lambda new_states, old_states: State.sorter(new_states, old_states, beam_width=params['beam_width']),
                            choose_state_to_expand=lambda states: states.pop(),
