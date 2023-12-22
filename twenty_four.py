@@ -1,11 +1,7 @@
 from search import *
 import itertools
-from itertools import chain
-import math
 import copy
-from common.utils import *
-import ast
-import numpy as np
+import re
 from pathlib import Path
 
 def remove(lst,index_pair):
@@ -58,9 +54,9 @@ def combine(num_list,n):
     '''
     Return the set of all values that can be obtained by applying an operation to n and an element of num_list (in any order).
     '''        
-    return set(chain.from_iterable([[n+m,n-m,m-n,n*m] +
-                                    ([n/m] if m != 0 else []) +
-                                    ([m/n] if n != 0 else []) for m in num_list]))
+    return set(itertools.chain.from_iterable([[n+m,n-m,m-n,n*m] +
+                                              ([n/m] if m != 0 else []) +
+                                              ([m/n] if n != 0 else []) for m in num_list]))
 
 def sample(num_list):
     '''
